@@ -37,7 +37,8 @@ class StatsdHandler(logging.Handler):
             disabled=self.disabled)
         self.publish_templates = self.DEFAULT_PUBLISH_TEMPLATES
         publish_templates = self.config.get('publish_templates', {})
-        self.publish_templates.update(publish_templates)
+        for template in publish_templates:
+            self.publish_templates.update(template)
         self.timer = statsd.timer.Timer(self.app_key, self.connection)
         self.counter = statsd.counter.Counter(self.app_key, self.connection)
         self.gauge = statsd.gauge.Gauge(self.app_key, self.connection)
@@ -87,15 +88,7 @@ class StatsdHandler(logging.Handler):
         except:
             pass
 
-    def _publish_raw(self, subname, value):
-        if value is None:
-            return
-        try:
-            self.gauge.send(subname, value)
-        except:
-            pass
-
-    def _publish_gauge(self, action, subname, value):
+    def _publish_gauge(self, subname, action, value):
         if value is None:
             return
         try:
