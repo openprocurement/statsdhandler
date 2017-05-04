@@ -1,3 +1,6 @@
+[![Coverage Status](https://coveralls.io/repos/github/openprocurement/statsdhandler/badge.svg)](https://coveralls.io/github/openprocurement/statsdhandler)
+[![Build Status](https://travis-ci.org/openprocurement/statsdhandler.svg?branch=master)](https://travis-ci.org/openprocurement/statsdhandler)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 # StatsdHandler
 
 Logging Handler який відслідковує задані в конфігураційному файлі `MESSAGE_ID`
