@@ -1,8 +1,11 @@
 import unittest
 
+from statsdhandler.tests import test_statsdhandler
+
 
 def suite():
     suite = unittest.TestSuite()
+    suite.addTest(test_statsdhandler.suite())
     return suite
 
 

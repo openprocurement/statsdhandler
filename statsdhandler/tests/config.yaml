@@ -20,6 +20,9 @@ counters:
   REQUEST_DUR:
     value_type: value
     publish_template: all_levels
+  REQUEST_DUR_CUSTOM:
+    value_type: custom
+    publish_template: invalid
 timers:
   - start_attr_name: JOURNAL_REQUEST_START_1
     end_attr_name: JOURNAL_REQUEST_END_1
@@ -29,14 +32,28 @@ timers:
     end_attr_name: JOURNAL_REQUEST_END_2
     publish_template: full_path
     name: timer_name_2
+  - start_attr_name: JOURNAL_REQUEST_START_2
+    end_attr_name: JOURNAL_REQUEST_END_3
+    name: timer_name_6
+    publish_template: invalid
   - value_attr_name: JOURNAL_REQUEST_DUR_TIME
     publish_template: full_path
     name: timer_name_3
   - start_attr_name: JOURNAL_REQUEST_DUR_TIME_2
     publish_template: full_path
     name: timer_name_4
+  - value_attr_name: JOURNAL_REQUEST_DUR_TIME_3
+    name: timer_name_5
+    publish_template: invalid
+
 gauges:
   JOURNAL_GAUGE_ATTR:
     name: gauge_name
     action: increment
     publish_template: full_path
+  JOURNAL_GAUGE_ATTR_DECR:
+    name: gauge_decrement_name
+    action: decrement
+  JOURNAL_GAUGE_ATTR_DEFAULT:
+    name: gauge_default_action
+    publish_template: invalid
