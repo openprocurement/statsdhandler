@@ -5,11 +5,11 @@ statsite:
   sample_rate: 1
   disabled: False
 publish_templates:
-  - all_levels:
+  all_levels:
     - '%(logger)s;%(attr)s;%(metric_name)s'
     - '%(attr)s;%(metric_name)s'
     - '%(metric_name)s'
-  - full_path:
+  full_path:
     - '%(logger)s;%(attr)s;%(metric_name)s'
 counters:
   JOURNAL_REQUEST_METHOD_2:
@@ -45,7 +45,6 @@ timers:
   - value_attr_name: JOURNAL_REQUEST_DUR_TIME_3
     name: timer_name_5
     publish_template: invalid
-
 gauges:
   JOURNAL_GAUGE_ATTR:
     name: gauge_name

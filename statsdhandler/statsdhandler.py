@@ -37,8 +37,7 @@ class StatsdHandler(logging.Handler):
             disabled=self.disabled)
         self.publish_templates = self.DEFAULT_PUBLISH_TEMPLATES
         publish_templates = self.config.get('publish_templates', {})
-        for template in publish_templates:
-            self.publish_templates.update(template)
+        self.publish_templates.update(publish_templates)
         self.timer = statsd.timer.Timer(self.app_key, self.connection)
         self.counter = statsd.counter.Counter(self.app_key, self.connection)
         self.gauge = statsd.gauge.Gauge(self.app_key, self.connection)
