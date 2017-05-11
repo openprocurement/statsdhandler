@@ -1,4 +1,4 @@
-statsite:
+main:
   app_key: app_key
   host: localhost
   port: 8125
@@ -47,12 +47,19 @@ timers:
     publish_template: invalid
 gauges:
   JOURNAL_GAUGE_ATTR:
-    name: gauge_name
-    action: increment
     publish_template: full_path
-  JOURNAL_GAUGE_ATTR_DECR:
-    name: gauge_decrement_name
-    action: decrement
+  JOURNAL_GAUGE_ATTR_DECR: {}
   JOURNAL_GAUGE_ATTR_DEFAULT:
-    name: gauge_default_action
+    publish_template: invalid
+histograms:
+  HISTOGRAM_ARG: {}
+  HISTOGRAM_ARG_2:
+    publish_template: full_path
+  HISTOGRAM_ARG_3:
+    publish_template: invalid
+sets:
+  SET_ARG: {}
+  SET_ARG_2:
+    publish_template: full_path
+  SET_ARG_3:
     publish_template: invalid

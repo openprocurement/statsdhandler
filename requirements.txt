@@ -1,5 +1,5 @@
 pyyaml
-python-statsd
+datadog
 coverage
 python-coveralls
 mock

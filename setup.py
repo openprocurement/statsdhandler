@@ -1,11 +1,12 @@
 from setuptools import setup, find_packages
-import sys, os
+import sys
+import os
 
 version = '0.0.1'
 
 requires = [
     'pyyaml',
-    'python-statsd',
+    'datadog',
 ]
 
 test_requires = requires + [
@@ -18,12 +19,13 @@ test_requires = requires + [
 
 setup(name='statsdhandler',
       version=version,
-      description="Python logging handler for generate metrics and publish to statsite",
+      description='Python logging handler for generate metrics and publish '
+      'to statsite',
       long_description="""\
 """,
       classifiers=[
           "Programming Language :: Python",
-      ], # Get strings from http://pypi.python.org/pypi?%3Aaction=list_classifiers
+      ],
       keywords='',
       author='Quintagroup, Ltd.',
       author_email='info@quintagroup.com',

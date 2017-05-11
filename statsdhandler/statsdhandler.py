@@ -2,8 +2,8 @@
 import argparse
 import os
 from yaml import load
+from datadog.dogstatsd import DogStatsd
 import logging
-import statsd
 import time
 
 
@@ -32,19 +32,19 @@ class StatsdHandler(logging.Handler):
         for key in self.DEFAULT_CONFIG:
             setattr(self, key, self.config.get('main', {}).get(key, None) or
                     self.DEFAULT_CONFIG[key])
-        self.connection = statsd.Connection(
-            host=self.host, port=self.port, sample_rate=self.sample_rate,
-            disabled=self.disabled)
+
+        # Initialize Statsd Client
+        self.statsd = DogStatsd(
+            host=self.host, port=self.port, namespace=self.app_key)
+
         self.publish_templates = self.DEFAULT_PUBLISH_TEMPLATES
         publish_templates = self.config.get('publish_templates', {})
         self.publish_templates.update(publish_templates)
-        self.timer = statsd.timer.Timer(self.app_key, self.connection)
-        self.counter = statsd.counter.Counter(self.app_key, self.connection)
-        self.gauge = statsd.gauge.Gauge(self.app_key, self.connection)
-        self.raw = statsd.raw.Raw(self.app_key, self.connection)
         self.counters = self.config.get('counters', {})
         self.gauges = self.config.get('gauges', {})
         self.timers = self.config.get('timers', [])
+        self.histograms = self.config.get('histograms', {})
+        self.sets = self.config.get('sets', {})
         self.timers_start_keys = self._get_timers_keys_list('start')
         self.timers_end_keys = self._get_timers_keys_list('end')
         self.timers_value_keys = self._get_timers_keys_list('value')
@@ -75,47 +75,32 @@ class StatsdHandler(logging.Handler):
     def _publish_count(self, subname, value):
         try:
             if float(value) > 0:
-                self.counter.increment(subname, value)
+                self.statsd.increment(subname, value)
             else:
-                self.counter.decrement(subname, value)
+                self.statsd.decrement(subname, value)
         except:
             pass
 
     def _publish_timer(self, subname, value):
         try:
-            self.timer.send(subname, value)
-        except:
-            pass
-
-    def _publish_gauge(self, subname, action, value):
-        if value is None:
-            return
-        try:
-            if action == 'increment':
-                self.gauge.increment(subname, value)
-            elif action == 'decrement':
-                self.gauge.decrement(subname, value)
-            elif action == 'send':
-                self.gauge.send(subname, value)
+            self.statsd.timing(subname, value)
         except:
             pass
 
     def _process_counter_metrics(self, attr, record):
         lookup_value = self.counters[attr].get('lookup_value', 'None')
-        value = getattr(record, attr, lookup_value)
+        value = getattr(record, attr, None)
         value_type = self.counters[attr].get('value_type', 'key')
         value_equals = self.counters[attr].get('value_equals', [])
         publish_template = self.counters[attr].get('publish_template',
                                                    'default')
         if publish_template not in self.publish_templates:
             publish_template = 'default'
-        if value == '':
-            value = lookup_value
         if value_type == 'value':
             counter_subname = attr
-            counter_value = value
+            counter_value = value if value is not None else 1
         elif value_type == 'key':
-            counter_subname = value
+            counter_subname = value if value is not None else lookup_value
             if len(value_equals) > 0 and value not in value_equals:
                 return
             counter_value = 1
@@ -128,20 +113,6 @@ class StatsdHandler(logging.Handler):
                 metric_name=counter_subname
             )
             self._publish_count(subname, counter_value)
-
-    def _process_gauge_metrics(self, attr, record):
-        value = getattr(record, attr, None)
-        action = self.gauges[attr].get('action', 'send')
-        name = self.gauges[attr].get('name', attr)
-        publish_template = self.gauges[attr].get('publish_template', 'default')
-        if publish_template not in self.publish_templates:
-            publish_template = 'default'
-        for pt in self.publish_templates[publish_template]:
-            subname = pt % dict(
-                logger=record.name,
-                attr=attr,
-                metric_name=name)
-            self._publish_gauge(subname, action, value)
 
     def _process_timer_metrics(self, attr, record, key_prefix):
         if key_prefix == 'start':
@@ -187,16 +158,47 @@ class StatsdHandler(logging.Handler):
                         metric_name=timer_name)
                     self._publish_timer(subname, timer_value)
 
+    def _get_publish_template(self, metric_type, attr):
+        metric_types_dict = getattr(self, metric_type, {})
+        if metric_type == 'sets':
+            publisher = self.statsd.set
+        elif metric_type == 'gauges':
+            publisher = self.statsd.gauge
+        elif metric_type == 'histograms':
+            publisher = self.statsd.histogram
+        else:
+            publisher = None
+        publish_template =\
+            metric_types_dict[attr].get('publish_template', 'default')
+        if publish_template not in self.publish_templates:
+            publish_template = 'default'
+        return publish_template, publisher
+
+    def _process_metrics(self, metric_type, attr, record):
+        value = getattr(record, attr, None)
+        if value is not None:
+            publish_template, publisher =\
+                self._get_publish_template(metric_type, attr)
+            for pt in self.publish_templates[publish_template]:
+                subname = pt % dict(
+                    logger=record.name,
+                    attr=attr,
+                    metric_name=attr)
+                publisher(subname, value)
+
     def emit(self, record):
         for attr in dir(record):
             if attr in self.counters:
                 self._process_counter_metrics(attr, record)
             elif attr in self.gauges:
-                value = getattr(record, attr, None)
-                self._process_gauge_metrics(attr, record)
+                self._process_metrics('gauges', attr, record)
             elif attr in self.timers_start_keys:
                 self._process_timer_metrics(attr, record, 'start')
             elif attr in self.timers_value_keys:
                 self._process_timer_metrics(attr, record, 'value')
+            elif attr in self.histograms:
+                self._process_metrics('histograms', attr, record)
+            elif attr in self.sets:
+                self._process_metrics('sets', attr, record)
             else:
                 continue
