@@ -1,0 +1,7 @@
+pyyaml
+python-statsd
+coverage
+python-coveralls
+mock
+munch
+nose
