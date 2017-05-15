@@ -3,86 +3,162 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 # StatsdHandler
 
-Logging Handler який відслідковує задані в конфігураційному файлі `MESSAGE_ID`
-і відсилає у statsite метрики які передаються в полі з префіксом `perfdata.`
+Logging handler для представлення параметрів, які передаються в `extra` повідомлення логування у вигляді певних метрик
 
-### Як користуватись
+Установка:
 
+`pip install statsdhandler`
+### Типи метрик
+
+**StatsdHandler** параметри в лог записі може представляти у вигляді наступних метрик
+  * **Gauge** - аплікація відправляє `metric_name:value|g` де `value` десяткове/дробове число,
+  _statsd_ повертає останнє значення. Також аплікація може інкрементувати або декрементувати попереднє значення якщо перед ним першим символом буде `+` або `-`
+  * **Counters/Лічильники** - аплікація відправляє `metric_name:value|c`, де `value` додатнє або від'ємне **ціле** число подій що відбулись
+  _statsd_ повертає суму значень
+  * **Timers/Histograms** - аплікація віправляє `metric_name:value|ms` або `metric_name:value|h`, де `value` є будь-яке дробове число,
+  _statsd_ повертає **min, max, average, average of 95 percentile, median і standart deviation**
+  * **Sets** - аплікація відправляє `metric_name:value|s`, де `value` будь-що (число або текст, пробіли на початку і в кінці стрічки видаляються)
+  _statsd_ повертає к-ть унікальних значень серед відправлених.
+
+### Налаштування
+#### Безпосередньо в коді
 ```python
 import logging
 from statsdhandler.statsdhandler import StatsdHandler
 import time
 
-logger = logging.getLogger('logger_name')
+logger = logging.getLogger('mylogger')
 logger.setLevel(logging.DEBUG)
 
-fh = logging.FileHandler('path_to_log.log')
-fh.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-fh.setFormatter(formatter)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.DEBUG)
-ch.setFormatter(formatter)
-
-sdh = StatsdHandler(config_path='path/to/config')
+sdh = StatsdHandler(config_path='path/to/config.yaml')
 sdh.setLevel(logging.DEBUG)
 
-logger.addHandler(fh)
-logger.addHandler(ch)
 logger.addHandler(sdh)
-
-start = time()
-logger.info('Increment counter', extra={'MESSAGE_ID': 'DOCUMENT_UPDATE',
-                                        'perfdata.c.': 1})
-logger.info('Increment counter with some value',
-            extra={'MESSAGE_ID': 'DOCUMENT_SAVE', 'perfdata.c.': 3})
-logger.info('Set dimension', extra={'MESSAGE_ID': 'INDEXATION_PROGRESS',
-            'perfdata.kv.index_name': 97})
-end = time()
-logger.debug('Timer metric', extra={'MESSAGE_ID': 'LOGGING_DURATION',
-                                    'perfdata.ms.metric_name': end - start})
 ```
 
-Ключові значення в параметрі `extra`:
-* `MESSAGE_ID` - має мати значення одне з таких які задані в конфіг файлі
-* `perfdata.<metic_type>.<metric_name>` - це назва поля з якою працює хендлер
-  складається поле:
-    * `perfdata` - префікс для хендлера
-    * `<metric_type>` - це тип метрики яку віддаватимемо в **statsite** може мати наступні значення
-      - `kv`, `raw` - для відправлення метрик типу _<ключ>:<значення>_
-      - `ms`, `h` - для відправлення таймерів
-      - `c` - для відправлення лічильників
-      - `g` - для відправлення _gauge_ метрик
-    * `<metric_name>` - (уточнююча) назва метрики, якщо в словнику в `extra` передати 'perf-параметр' наступного формату `perfdata.MESSAGE_ID.` то замість назви метрики підставиться MESSAGE_ID в lowercase.
+#### Використовуючи конфігураційний файл вашої аплікації
+```yaml
+main:
+  host: localhost
+  port: 1234
+  my_app_other_param: some_value_3
 
-Лістінг конфігураційного файлу хендлера
+formatters:
+  simple:
+    format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+handlers:
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: simple
+    stream: ext://sys.stdout
+  statsd:
+    class: statsdhandler.statsdhandler.StatsdHandler
+    level: DEBUG
+    config_path: path/to/handler/config.yaml
+
+loggers:
+  mylogger:
+    handlers: [console, statsd]
+    propagate: no
+    level: DEBUG
+
+  mylogger_2:
+    handlers: [console, statsd]
+    propagate: no
+    level: DEBUG
+
+  "":
+    handlers: [console, statsd]
+    level: DEBUG
+```
+
+Лістінг конфігураційного файлу хендлера:
+
 ```yaml
 main:
   app_key: app_key
   host: localhost
   port: 8125
-  sample_rate: 1
-  disabled: False
-publish_formats:
-  DOCUMENT_UPDATE:
-    - '%(logger)s;%(message_id)s;%(metric_name)s'
-  DOCUMENT_SAVE:
-    - '%(logger)s;%(message_id)s;%(metric_name)s'
-  INDEXATION_PROGRESS:
-    - '%(logger)s;%(message_id)s;%(metric_name)s'
-  LOGGING_DURATION:
-    - '%(logger)s;%(message_id)s;%(metric_name)s'
-    - '%(message_id)s;%(metric_name)s'
+publish_templates:
+  all_levels:
+    - '%(logger)s;%(attr)s;%(metric_name)s'
+    - '%(attr)s;%(metric_name)s'
     - '%(metric_name)s'
+  full_path:
+    - '%(logger)s;%(attr)s;%(metric_name)s'
+counters:
+  MESSAGE_ID:
+    value_type: key
+  REQUEST_METHOD:
+    value_equals: [POST, PUT]
+    value_type: key
+    publish_template: all_levels
+  REQUESTS:
+    value_type: value
+    publish_template: full_path
+timers:
+  - start_attr_name: JOURNAL_REQUEST_START_1
+    end_attr_name: JOURNAL_REQUEST_END_1
+    publish_template: full_path
+    name: timer_name
+  - value_attr_name: JOURNAL_REQUEST_DUR_TIME
+    publish_template: full_path
+    name: timer_name_3
+gauges:
+  JOURNAL_GAUGE_ATTR:
+    publish_template: full_path
+  JOURNAL_GAUGE_ATTR_DECR: {}
+histograms:
+  HISTOGRAM_ARG:
+    publish_template: full_path
+sets:
+  SET_ARG: {}
+  SET_ARG:
+    publish_template: full_path
 ```
+
 В конфігураційному файлі хендлера ключові значення:
-* в секції `main`
-  - `app_key` - ключ для метрик, щоб потім можна було розкинути метрики по відповідних pipe'ах
-  - `host` - ІР на якому 'крутиться' **statsite**
-  - `port` - порт на якому крутиться **statsite**
-  повний опис [тут](https://python-statsd.readthedocs.io/en/latest/statsd.connection.html)
-* в секції `publish_formats`:
-  - `DOCUMENT_SAVE`, `DOCUMENT_UPDATE`, `INDEXATION_PROGRESS`, `LOGGING_DURATION` - це `MESSAGE_ID`'s які хендлер буде відсліковувати і вісилати метрики в заданих форматах
-  - `'%(logger)s;%(message_id)s;%(metric_name)s'` - формат в якому будуть відіслані метрики в **statsite** наприклад при даному форматі в **statsiste** відправиться наступний рядок для таймера
-`'app_key;logger_name;MESSAGE_ID;metric_name:value|ms'`
+* секція `main`
+  - `app_key` - префікс для метрик
+  - `host` - ІР на якому 'крутиться' **statsd**
+  - `port` - порт на якому крутиться **statsd**
+
+* секція `publish_templates`:
+  `all_levels` i `full_path` - це шаблони форматів метрик, які хендлер буде відсилати в _statsd_
+  наприклад для шаблону `all_levels` і лічильника `REQUEST_METHOD` одна і таж метрика буде відсилатись тричі
+  ```
+  app_key.mylogger;REQUEST_METHOD;POST:1|c
+  app_key.REQUEST_METHOD;POST:1|c
+  app_key.POST:1|c
+  ```
+  такий спосіб надсилання потрібний для того щоб агрегувати одні і тіж метрики на кілької рівнях аплікації, у варіанті з логером ми отримаємо на виході к-ть POST опрацьованих певним модулем, у варіанті без логера ми отримаєм к-ть POST із заданим атрибутом по всіх логерах, і у варіанті де лише app_key i POST ми отримаємо к-ть POST по всій аплікації зі всіх модулів із різних атрибутів що відслідковуються.
+* секція `counters`:
+  `MESSAGE_ID`, `REQUEST_METHOD`, `REQUESTS` - перелік атрибутів `log_recod` об'єкту які будуть надсилатись в _statsd_ як лічильники, кожен з них це словник, який може бути пустим або мати наступні ключі:
+  - `value_type` - це строка яка може приймати значення `key` або `value` яка вказує як інтерпретувати значення атрибуту, як ключ чи як значення, у випаду `key` значення атрибуту додасться в кінці назви метрики, а значенням лічильника буде 1
+  ```python
+  logger.info('Upload file', extra={'MESSAGE_ID': 'upload_file'})
+  ```
+  в _statsd_ відправиться наступне:
+  ```
+  app_key.mylogger;MESSAGE_ID;upload_file:1|c
+  ```
+  в іншому випадку атрибут буде закінченням назви метрики а значення атрибута буде значенням метрики
+  ```python
+  logger.info('New requests', extra={'REQUESTS': 5})
+  ```
+  в _statsd_ відправиться:
+  ```
+  app_key.mylogger;REQUESTS;REQUESTS:5|c
+  ```
+  - `value_equals` - це масив який містить значення які потрібно надсилати у _statsd_, тобто якщо атрибут `REQUEST_METHOD` матиме значення відмінне від `POST` i `PUT`, то в _statsd_ нічого не відправиться
+  - `publish_template` - строка яка містить назву шаблону, якщо її не передати, то використовуватиметься шаблон по замовчуванню такий же як `full_path`, якщо передати невірну назву шаблону, то також буде використовуватись шаблон по замовчуванню.
+* секція `timers`:
+  Це масив словників які описують параметри таймерів:
+  - `start_attr_name` - назва атрибуту, значення якого сприймати за початок відліку
+  - `end_attr_name` - назва атрибуту, значення якого сприймати як кінець відліку
+  - `value_attr_name` - назва атрибуту, значення якого сприймати як результат (час) виконання певного процесу
+  - `name` - назва яка буде використовуватись для таймера для шаблонів це змінна `%(metric_name)s`
+* секції `gauges`, `histograms` i `sets`:
+  Це словники в яких ключем виступає назва атрибуту який буде представлятись як метрики `gauges`, `histograms` або `sets` в залежності від секції в якій буде розміщенний, а значенням словник який може бути пустим або містити ключ `publish_template` який вказує на шаблон форматування метрики.
