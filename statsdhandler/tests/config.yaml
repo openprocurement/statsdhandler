@@ -1,0 +1,65 @@
+main:
+  app_key: app_key
+  host: localhost
+  port: 8125
+  sample_rate: 1
+  disabled: False
+publish_templates:
+  all_levels:
+    - '%(logger)s;%(attr)s;%(metric_name)s'
+    - '%(attr)s;%(metric_name)s'
+    - '%(metric_name)s'
+  full_path:
+    - '%(logger)s;%(attr)s;%(metric_name)s'
+counters:
+  JOURNAL_REQUEST_METHOD_2:
+    value_equals: [POST, PUT]
+    value_type: key
+    publish_template: full_path
+  JOURNAL_USER_AGENT: {}
+  REQUEST_DUR:
+    value_type: value
+    publish_template: all_levels
+  REQUEST_DUR_CUSTOM:
+    value_type: custom
+    publish_template: invalid
+timers:
+  - start_attr_name: JOURNAL_REQUEST_START_1
+    end_attr_name: JOURNAL_REQUEST_END_1
+    publish_template: full_path
+    name: timer_name
+  - start_attr_name: JOURNAL_REQUEST_START_1
+    end_attr_name: JOURNAL_REQUEST_END_2
+    publish_template: full_path
+    name: timer_name_2
+  - start_attr_name: JOURNAL_REQUEST_START_2
+    end_attr_name: JOURNAL_REQUEST_END_3
+    name: timer_name_6
+    publish_template: invalid
+  - value_attr_name: JOURNAL_REQUEST_DUR_TIME
+    publish_template: full_path
+    name: timer_name_3
+  - start_attr_name: JOURNAL_REQUEST_DUR_TIME_2
+    publish_template: full_path
+    name: timer_name_4
+  - value_attr_name: JOURNAL_REQUEST_DUR_TIME_3
+    name: timer_name_5
+    publish_template: invalid
+gauges:
+  JOURNAL_GAUGE_ATTR:
+    publish_template: full_path
+  JOURNAL_GAUGE_ATTR_DECR: {}
+  JOURNAL_GAUGE_ATTR_DEFAULT:
+    publish_template: invalid
+histograms:
+  HISTOGRAM_ARG: {}
+  HISTOGRAM_ARG_2:
+    publish_template: full_path
+  HISTOGRAM_ARG_3:
+    publish_template: invalid
+sets:
+  SET_ARG: {}
+  SET_ARG_2:
+    publish_template: full_path
+  SET_ARG_3:
+    publish_template: invalid

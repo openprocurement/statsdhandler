@@ -1,0 +1,7 @@
+pyyaml
+datadog
+coverage
+python-coveralls
+mock
+munch
+nose
